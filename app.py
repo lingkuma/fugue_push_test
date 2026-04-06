@@ -41,24 +41,19 @@ def push_to_github(filename, content):
         # 获取当前项目目录（Git仓库根目录）
         repo_path = os.path.dirname(os.path.abspath(__file__))
         
-        # 在本地创建文件
-        file_path = os.path.join(repo_path, filename)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-        
         # 用 subprocess 设置 safe.directory，绕过Git安全检查
         subprocess.run(
             ['git', 'config', '--global', '--add', 'safe.directory', repo_path],
             check=True
         )
         
+        # 在本地创建文件
+        file_path = os.path.join(repo_path, filename)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
         # 打开Git仓库
         repo = Repo(repo_path)
-        
-        # 设置远程URL（使用token认证）
-        remote_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
-        origin = repo.remote(name='origin')
-        origin.set_url(remote_url)
         
         # Git add
         repo.index.add([filename])
@@ -66,8 +61,9 @@ def push_to_github(filename, content):
         # Git commit
         repo.index.commit(f"Add test file: {filename}")
         
-        # Git push
-        origin.push(GITHUB_BRANCH)
+        # 直接 push 到带 token 的 URL，不修改 .git/config
+        remote_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
+        repo.git.push(remote_url, GITHUB_BRANCH)
         
         return True, None
     except Exception as e:
