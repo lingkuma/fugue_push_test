@@ -5,6 +5,7 @@ GitHub API Push测试服务
 
 import os
 import hashlib
+import subprocess
 from datetime import datetime
 from flask import Flask, jsonify
 from git import Repo
@@ -37,9 +38,6 @@ def create_file_content():
 def push_to_github(filename, content):
     """在本地创建文件，然后commit并push到GitHub仓库"""
     try:
-        # 设置环境变量绕过Git安全检查
-        os.environ['GIT_SAFE_DIRECTORY'] = '*'
-        
         # 获取当前项目目录（Git仓库根目录）
         repo_path = os.path.dirname(os.path.abspath(__file__))
         
@@ -47,6 +45,12 @@ def push_to_github(filename, content):
         file_path = os.path.join(repo_path, filename)
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
+        
+        # 用 subprocess 设置 safe.directory，绕过Git安全检查
+        subprocess.run(
+            ['git', 'config', '--global', '--add', 'safe.directory', repo_path],
+            check=True
+        )
         
         # 打开Git仓库
         repo = Repo(repo_path)
