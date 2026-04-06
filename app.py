@@ -7,7 +7,7 @@ import os
 import hashlib
 from datetime import datetime
 from flask import Flask, jsonify
-from git import Repo
+from github import Github
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -35,9 +35,9 @@ def create_file_content():
 
 
 def push_to_github(filename, content):
-    """在本地创建文件，然后commit并push到GitHub仓库"""
+    """在本地创建文件，然后通过GitHub API push到远程仓库"""
     try:
-        # 获取当前项目目录（Git仓库根目录）
+        # 获取当前项目目录
         repo_path = os.path.dirname(os.path.abspath(__file__))
         
         # 在本地创建文件
@@ -45,22 +45,19 @@ def push_to_github(filename, content):
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        # 打开Git仓库
-        repo = Repo(repo_path)
+        # 初始化GitHub客户端
+        g = Github(GITHUB_TOKEN)
         
-        # 设置远程URL（使用token认证）
-        remote_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
-        origin = repo.remote(name='origin')
-        origin.set_url(remote_url)
+        # 获取仓库对象
+        repo = g.get_repo(GITHUB_REPO)
         
-        # Git add
-        repo.index.add([filename])
-        
-        # Git commit
-        repo.index.commit(f"Add test file: {filename}")
-        
-        # Git push
-        origin.push(GITHUB_BRANCH)
+        # 通过API创建文件并提交
+        repo.create_file(
+            path=filename,
+            message=f"Add test file: {filename}",
+            content=content,
+            branch=GITHUB_BRANCH
+        )
         
         return True, None
     except Exception as e:
