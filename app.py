@@ -5,9 +5,9 @@ GitHub API Push测试服务
 
 import os
 import hashlib
-import subprocess
 from datetime import datetime
 from flask import Flask, jsonify
+from github import Github
 from dotenv import load_dotenv
 
 # 加载环境变量
@@ -35,39 +35,21 @@ def create_file_content():
 
 
 def push_to_github(filename, content):
-    """在本地创建文件，然后commit并push到GitHub仓库"""
+    """通过GitHub API将文件push到指定仓库"""
     try:
-        # 获取当前项目目录（Git仓库根目录）
-        repo_path = os.path.dirname(os.path.abspath(__file__))
+        # 初始化GitHub客户端
+        g = Github(GITHUB_TOKEN)
         
-        # 创建文件
-        file_path = os.path.join(repo_path, filename)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(content)
+        # 获取仓库对象
+        repo = g.get_repo(GITHUB_REPO)
         
-        # 设置远程URL（带token认证）
-        remote_url = f"https://{GITHUB_TOKEN}@github.com/{GITHUB_REPO}.git"
-        
-        # 设置环境变量
-        env = os.environ.copy()
-        env['GIT_DIR'] = os.path.join(repo_path, '.git')
-        env['GIT_WORK_TREE'] = repo_path
-        
-        def run(cmd):
-            """执行git命令的辅助函数"""
-            subprocess.run(cmd, cwd=repo_path, env=env, check=True)
-        
-        # 设置 safe.directory，绕过Git安全检查
-        run(['git', 'config', '--global', '--add', 'safe.directory', repo_path])
-        
-        # Git add
-        run(['git', 'add', filename])
-        
-        # Git commit
-        run(['git', 'commit', '-m', f'Add test file: {filename}'])
-        
-        # Git push
-        run(['git', 'push', remote_url, GITHUB_BRANCH])
+        # 创建文件并提交
+        repo.create_file(
+            path=filename,
+            message=f"Add test file: {filename}",
+            content=content,
+            branch=GITHUB_BRANCH
+        )
         
         return True, None
     except Exception as e:
@@ -106,30 +88,6 @@ def test_push():
 def health_check():
     """健康检查端点"""
     return jsonify({"status": "healthy"}), 200
-
-
-@app.route('/debug', methods=['GET'])
-def debug():
-    """调试端点，检查权限情况"""
-    repo_path = os.path.dirname(os.path.abspath(__file__))
-    git_dir = os.path.join(repo_path, '.git')
-    
-    # 检查 .git 目录权限
-    result = subprocess.run(['ls', '-la', git_dir], capture_output=True, text=True)
-    
-    # 检查当前用户
-    result2 = subprocess.run(['whoami'], capture_output=True, text=True)
-    
-    # 检查当前目录权限
-    result3 = subprocess.run(['ls', '-la', repo_path], capture_output=True, text=True)
-    
-    return jsonify({
-        "git_dir_listing": result.stdout,
-        "git_dir_error": result.stderr,
-        "current_user": result2.stdout.strip(),
-        "repo_dir_listing": result3.stdout,
-        "repo_path": repo_path
-    })
 
 
 if __name__ == '__main__':
